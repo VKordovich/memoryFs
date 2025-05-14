@@ -134,6 +134,7 @@ func (f *File) Close() error {
 		return errors.New("file is closed")
 	}
 	f.closed = true
+	f.pos = 0
 	return nil
 }
 
