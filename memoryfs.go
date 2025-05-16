@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type File struct {
 	pos     int64
 	modTime time.Time
 	closed  bool
+	mu      sync.RWMutex
 }
 
 type fileInfo struct {
@@ -50,6 +52,9 @@ func (f *File) Stat() (fs.FileInfo, error) {
 }
 
 func (f *File) Read(p []byte) (n int, err error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	if f.closed {
 		return 0, errors.New("file is closed")
 	}
@@ -62,6 +67,9 @@ func (f *File) Read(p []byte) (n int, err error) {
 }
 
 func (f *File) ReadAt(p []byte, off int64) (n int, err error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	if f.closed {
 		return 0, errors.New("file is closed")
 	}
@@ -73,14 +81,21 @@ func (f *File) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (f *File) Write(p []byte) (n int, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.closed {
 		return 0, errors.New("file is closed")
 	}
 	f.data = append(f.data, p...)
+	f.modTime = time.Now()
 	return len(p), nil
 }
 
 func (f *File) WriteAt(p []byte, off int64) (n int, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.closed {
 		return 0, errors.New("file is closed")
 	}
@@ -89,11 +104,15 @@ func (f *File) WriteAt(p []byte, off int64) (n int, err error) {
 		copy(newData, f.data)
 		f.data = newData
 	}
+	f.modTime = time.Now()
 	n = copy(f.data[off:], p)
 	return n, nil
 }
 
 func (f *File) WriteTo(w io.Writer) (n int64, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.closed {
 		return 0, errors.New("file is closed")
 	}
@@ -103,6 +122,9 @@ func (f *File) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 func (f *File) Seek(off int64, whence int) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.closed {
 		return 0, errors.New("file is closed")
 	}
@@ -130,6 +152,9 @@ func (f *File) Seek(off int64, whence int) (int64, error) {
 }
 
 func (f *File) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.closed {
 		return errors.New("file is closed")
 	}
@@ -142,9 +167,13 @@ func (f *File) Bytes() []byte { return f.data }
 
 type FS struct {
 	files map[string][]byte
+	mu    sync.RWMutex
 }
 
 func (fsLocal *FS) Open(name string) (fs.File, error) {
+	fsLocal.mu.RLock()
+	defer fsLocal.mu.RUnlock()
+
 	if !fs.ValidPath(name) {
 		return nil, errors.New("invalid path")
 	}
