@@ -8,6 +8,21 @@ import (
 	"time"
 )
 
+type Once struct {
+	done bool
+	m    sync.Mutex
+}
+
+func (o *Once) Do(f func()) {
+	o.m.Lock()
+	defer o.m.Unlock()
+
+	if !o.done {
+		f()
+		o.done = true
+	}
+}
+
 type File struct {
 	data    []byte
 	name    string
@@ -15,6 +30,7 @@ type File struct {
 	modTime time.Time
 	closed  bool
 	mu      sync.RWMutex
+	once    Once
 }
 
 type fileInfo struct {
@@ -152,14 +168,12 @@ func (f *File) Seek(off int64, whence int) (int64, error) {
 }
 
 func (f *File) Close() error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.once.Do(func() {
+		f.closed = true
+		f.data = nil
+		f.pos = 0
+	})
 
-	if f.closed {
-		return errors.New("file is closed")
-	}
-	f.closed = true
-	f.pos = 0
 	return nil
 }
 

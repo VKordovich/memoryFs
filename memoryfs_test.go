@@ -188,7 +188,7 @@ func TestFileWrite(t *testing.T) {
 			data:     []byte("Ignored text"),
 			wantN:    0,
 			wantErr:  errors.New("file is closed"),
-			wantData: "Avanpost",
+			wantData: "",
 			closed:   true,
 		},
 	}
@@ -246,7 +246,7 @@ func TestFileWriteAt(t *testing.T) {
 			data:     []byte("Ignored text"),
 			wantN:    0,
 			wantErr:  errors.New("file is closed"),
-			wantData: "Avanpost Moscow",
+			wantData: "",
 			closed:   true,
 		},
 	}
@@ -465,7 +465,7 @@ func TestFileClose(t *testing.T) {
 	}
 
 	err = f.Close()
-	if !reflect.DeepEqual(err, errors.New("file is closed")) {
+	if err != nil {
 		t.Errorf("TestFileClose error on second call = %v, want %v", err, errors.New("file is closed"))
 	}
 }
